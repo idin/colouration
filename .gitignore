@@ -1,0 +1,6 @@
+
+build/*
+
+colouration\.egg-info/
+
+dist/
