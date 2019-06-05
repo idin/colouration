@@ -3,8 +3,11 @@ from .colour_names import hexadecimal_to_name, name_to_hexadecimal, colour_schem
 from .colourize import colourize
 
 
-def normalize(x, minimum, maximum):
-	return min(1.0, max(0.0, ((x - minimum) / (maximum - minimum))))
+def scale(x, minimum, maximum):
+	return (x - minimum) / (maximum - minimum)
+
+def limit(x, minimum=0.0, maximum=1.0):
+	return min(maximum, max(minimum, x))
 
 
 class Colour:
@@ -26,10 +29,44 @@ class Colour:
 				min_value = 0.0
 				max_value = 1.0
 				red, green, blue = colour.rgb
-		self._red = normalize(x=red, minimum=min_value, maximum=max_value)
-		self._green = normalize(x=green, minimum=min_value, maximum=max_value)
-		self._blue = normalize(x=blue, minimum=min_value, maximum=max_value)
+		self._red = scale(x=red, minimum=min_value, maximum=max_value)
+		self._green = scale(x=green, minimum=min_value, maximum=max_value)
+		self._blue = scale(x=blue, minimum=min_value, maximum=max_value)
 		self._name = name
+
+	@classmethod
+	def auto(cls, obj, copy=False):
+		"""
+		:type obj: Colour or str or tuple or list
+		:type copy: bool
+		:rtype: Colour
+		"""
+		if isinstance(obj, cls):
+			if copy:
+				return obj.copy()
+			else:
+				return obj
+		elif isinstance(obj, str):
+			if obj.startswith('#'):
+				return cls.from_hexadecimal(hexadecimal=obj)
+			else:
+				return cls(name=obj)
+		elif isinstance(obj, (list, tuple)):
+			return cls(red=obj[0], green=obj[1], blue=obj[2])
+		else:
+			raise TypeError('obj should be one of str, Colour, tuple, or list.')
+
+	@property
+	def red(self):
+		return limit(x=self._red)
+
+	@property
+	def green(self):
+		return limit(x=self._green)
+
+	@property
+	def blue(self):
+		return limit(x=self._blue)
 
 	def copy(self):
 		return self.__class__(red=self.red, green=self.green, blue=self.blue, name=self._name)
@@ -111,18 +148,6 @@ class Colour:
 		return cls(red=red, green=green, blue=blue, min_value=0.0, max_value=255, name=name)
 
 	@property
-	def red(self):
-		return self._red
-
-	@property
-	def green(self):
-		return self._green
-
-	@property
-	def blue(self):
-		return self._blue
-
-	@property
 	def name(self):
 		if self._name is not None:
 			return self._name
@@ -184,6 +209,13 @@ class Colour:
 		b = int(min(max(0.0, self.blue * 255), 255))
 		return '#{:02x}{:02x}{:02x}'.format(r, g, b)
 
+	def get_hexadecimal(self, opacity=1.0):
+		r = int(min(max(0.0, self.red * 255), 255))
+		g = int(min(max(0.0, self.green * 255), 255))
+		b = int(min(max(0.0, self.blue * 255), 255))
+		o = int(min(max(0.0, opacity * 255), 255))
+		return '#{:02x}{:02x}{:02x}{:02x}'.format(r, g, b, o)
+
 	def get_distance(self, other):
 		"""
 		:type other: Colour
@@ -201,15 +233,88 @@ class Colour:
 		"""
 		return sorted(colours, key=lambda x: self.get_distance(other=x))[0]
 
+	def limit(self):
+		self._red = self.red
+		self._green = self.green
+		self._blue = self.blue
+
+	@classmethod
+	def _tuple_as_colour(cls, other):
+		if isinstance(other, (tuple, list)):
+			if len(other) == 3:
+				other = cls(red=other[0], green=other[1], blue=other[2])
+		return other
+
 	def __add__(self, other):
 		"""
 		:type other: Colour
 		:rtype: Colour
 		"""
-		red = (self.red + other.red) / 2.0
-		green = (self.green + other.green) / 2.0
-		blue = (self.blue + other.blue) / 2.0
-		return self.__class__(red=red, green=green, blue=blue)
+		other = self._tuple_as_colour(other=other)
+
+		if isinstance(other, Colour):
+			return self.__class__(
+				red=self._red + other._red,
+				green=self._green + other._green,
+				blue=self._blue + other._blue
+			)
+		else:
+			return self.__class__(red=self._red + other, green=self._green + other, blue=self._blue + other)
+
+	def __sub__(self, other):
+		"""
+		:type other: Colour
+		:rtype: Colour
+		"""
+		other = self._tuple_as_colour(other=other)
+
+		return self.__class__(
+			red=self._red - other._red,
+			green=self._green - other._green,
+			blue=self._blue - other._blue
+		)
+
+	def __mul__(self, other):
+		"""
+		:type other: float
+		:rtype: Colour
+		"""
+		other = self._tuple_as_colour(other=other)
+
+		if isinstance(other, Colour):
+			return self.__class__(
+				red=self.red * other.red,
+				green=self.green * other.green,
+				blue=self.blue * other.blue
+			)
+		else:
+			return self.__class__(red=self._red * other, green=self._green * other, blue=self._blue * other)
+
+	def __neg__(self):
+		"""
+		:rtype: Colour
+		"""
+
+		return self.__class__(red=1 - self.red, green=1 - self.green, blue=1 - self.blue)
+
+	def __invert__(self):
+		return -self
+
+	def __and__(self, other):
+		if isinstance(other, (int, float)):
+			if other > 1 or other < 0:
+				raise ValueError('other cannot be negative or greated than one.')
+		other = self._tuple_as_colour(other=other)
+
+		return self * other
+
+	def __or__(self, other):
+		if isinstance(other, (int, float)):
+			if other > 1 or other < 0:
+				raise ValueError('other cannot be negative or greated than one.')
+		other = self._tuple_as_colour(other=other)
+
+		return self + other
 
 	def __getstate__(self):
 		return self.red, self.green, self.blue, self._name
@@ -217,9 +322,13 @@ class Colour:
 	def __setstate__(self, state):
 		self._red, self._green, self._blue, self._name = state
 
+	@property
+	def farthest_gray(self):
+		return self.__class__(name='white') if self.lightness < 0.5 else self.__class__(name='black')
+
 	def colourize(self, string, background='auto'):
 		if background == 'auto':
-			background = self.__class__(name='white') if self.lightness < 0.5 else self.__class__(name='black')
+			background = self.farthest_gray
 
 		if background is not None:
 			bg_red, bg_green, bg_blue = background.rgb
@@ -233,7 +342,7 @@ class Colour:
 
 	def colourize_background(self, string, text_colour='auto'):
 		if text_colour == 'auto':
-			text_colour = self.__class__(name='white') if self.lightness < 0.5 else self.__class__(name='black')
+			text_colour = self.farthest_gray
 
 		if text_colour is not None:
 			bg_red, bg_green, bg_blue = text_colour.rgb
@@ -256,3 +365,23 @@ class Colour:
 		if length is not None:
 			string = ('{:^' + str(int(length)) + '}').format(string)
 		self.print(string=string, secondary=secondary, end=end, main_colour=main_colour)
+
+	def darken(self, ratio=0.5):
+		"""
+		:rtype: Colour
+		"""
+		ratio = min(1.0, max(-1.0, ratio))
+		darker = self.copy()
+		darker.lightness = darker.lightness * (1 - ratio)
+		return darker
+
+	def lighten(self, ratio=0.5):
+		"""
+		:rtype: Colour
+		"""
+		ratio = min(1.0, max(-1.0, ratio))
+		lighter = self.copy()
+		lighter.lightness = lighter.lightness * (1 + ratio)
+		return lighter
+
+	brighten = lighten

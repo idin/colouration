@@ -8,13 +8,13 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
 	name='colouration',
-	version='0.1.5',
+	version='0.2.0',
 	license='MIT',
 	author='Idin',
 	author_email='py@idin.ca',
 	url='https://github.com/idin/colouration',
 	keywords='colour',
-	description='Python library for creating and drawing graphs and taking advantage of graph properties',
+	description='Python library working with colours',
 	long_description=long_description,
 	long_description_content_type='text/markdown',
 	classifiers=[
