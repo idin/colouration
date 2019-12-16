@@ -8,7 +8,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
 	name='colouration',
-	version='0.2.0',
+	version='1.0.2',
 	license='MIT',
 	author='Idin',
 	author_email='py@idin.ca',

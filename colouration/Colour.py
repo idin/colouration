@@ -1,17 +1,26 @@
 import colorsys
-from .colour_names import hexadecimal_to_name, name_to_hexadecimal, colour_schemes
+from .colour_schemes import hexadecimal_to_name, name_to_hexadecimal, colour_schemes
 from .colourize import colourize
+
+DEFAULT_INCREASE_RATIO = 0.2
+DEFAULT_INCREASE_AMOUNT = 0.1
 
 
 def scale(x, minimum, maximum):
 	return (x - minimum) / (maximum - minimum)
+
 
 def limit(x, minimum=0.0, maximum=1.0):
 	return min(maximum, max(minimum, x))
 
 
 class Colour:
-	def __init__(self, red=None, green=None, blue=None, min_value=0.0, max_value=1.0, name=None):
+	def __init__(
+			self, obj=None, red=None, green=None, blue=None, hexadecimal=None,
+			hue=None, saturation=None, lightness=None, value=None,
+			min_value=0.0, max_value=1.0, name=None, id=None, scheme=None,
+			weight=1.0
+	):
 		"""
 		:type red: float
 		:type green: float
@@ -19,57 +28,142 @@ class Colour:
 		:type min_value: float
 		:type max_value: float
 		:type name: NoneType or str
+		:type id: NoneType or int
+		:type scheme: NoneType or .Scheme.Scheme
 		"""
-		if red is None and green is None and blue is None:
-			if name is None:
-				raise ValueError('either red green blue should be provided or a name')
+		self._id = id
+		self._scheme = scheme
+		self._weight = weight
+
+		if obj is not None:
+			if isinstance(obj, self.__class__):
+				red, green, blue = obj.rgb
+
+			elif isinstance(obj, str):
+				if obj.startswith('#'):
+					hexadecimal = obj
+
+				else:
+					name = obj
+
+			elif isinstance(obj, (list, tuple)):
+				red, green, blue = obj
+
 			else:
-				hexadecimal = name_to_hexadecimal[name.lower()]
-				colour = self.from_hexadecimal(hexadecimal=hexadecimal)
-				min_value = 0.0
-				max_value = 1.0
-				red, green, blue = colour.rgb
+				raise TypeError('obj should be one of str, Colour, tuple, or list.')
+			min_value = 0.0
+			max_value = 1.0
+
+		if red is not None and green is not None and blue is not None:
+			pass
+
+		elif hue is not None and saturation is not None and lightness is not None:
+			red, green, blue = colorsys.hls_to_rgb(h=hue, l=lightness, s=saturation)
+			min_value = 0.0
+			max_value = 1.0
+
+		elif hue is not None and saturation is not None and value is not None:
+			red, green, blue = colorsys.hsv_to_rgb(h=hue, s=saturation, v=value)
+			min_value = 0.0
+			max_value = 1.0
+
+		elif hexadecimal is not None:
+			red, green, blue = self.convert_hexadecimal_to_rgb(hexadecimal=hexadecimal)
+			min_value = 0.0
+			max_value = 255.0
+
+		elif name is not None:
+			hexadecimal = name_to_hexadecimal[name.lower()]
+			red, green, blue = self.convert_hexadecimal_to_rgb(hexadecimal=hexadecimal)
+			min_value = 0.0
+			max_value = 255.0
+
+		else:
+			raise ValueError(f'obj: "{obj}" not acceptable. It is of type "{type(obj)}"')
+
 		self._red = scale(x=red, minimum=min_value, maximum=max_value)
 		self._green = scale(x=green, minimum=min_value, maximum=max_value)
 		self._blue = scale(x=blue, minimum=min_value, maximum=max_value)
 		self._name = name
 
-	@classmethod
-	def auto(cls, obj, copy=False):
+	@property
+	def scheme(self):
 		"""
-		:type obj: Colour or str or tuple or list
-		:type copy: bool
-		:rtype: Colour
+		:rtype: .Scheme.Scheme or NoneType
 		"""
-		if isinstance(obj, cls):
-			if copy:
-				return obj.copy()
-			else:
-				return obj
-		elif isinstance(obj, str):
-			if obj.startswith('#'):
-				return cls.from_hexadecimal(hexadecimal=obj)
-			else:
-				return cls(name=obj)
-		elif isinstance(obj, (list, tuple)):
-			return cls(red=obj[0], green=obj[1], blue=obj[2])
+		return self._scheme
+
+	@property
+	def id(self):
+		"""
+		:rtype: int or NoneTy[e
+		"""
+		return self._id
+
+	def use(self, log=None):
+		if self.scheme is not None:
+			self.scheme.use(colour=self, log=log)
+
+	@property
+	def logs(self):
+		if self.scheme is not None:
+			return self.scheme._usage_logs[self.id]
 		else:
-			raise TypeError('obj should be one of str, Colour, tuple, or list.')
+			return None
+
+	@property
+	def usage(self):
+		"""
+		:rtype: int
+		"""
+		if self.scheme is not None:
+			return self.scheme.get_usage(colour=self)
+		else:
+			return 0
+
+	def __delete_identity(self):
+		self._name = None
+		self._id = None
+		self._scheme = None
 
 	@property
 	def red(self):
 		return limit(x=self._red)
 
+	@red.setter
+	def red(self, red):
+		self.__delete_identity()
+		self._red = red
+
 	@property
 	def green(self):
 		return limit(x=self._green)
+
+	@green.setter
+	def green(self, green):
+		self.__delete_identity()
+		self._green = green
 
 	@property
 	def blue(self):
 		return limit(x=self._blue)
 
-	def copy(self):
-		return self.__class__(red=self.red, green=self.green, blue=self.blue, name=self._name)
+	@blue.setter
+	def blue(self, blue):
+		self.__delete_identity()
+		self._blue = blue
+
+	def copy(self, keep_id=True):
+		if keep_id:
+			return self.__class__(
+				red=self.red, green=self.green, blue=self.blue, name=self._name, id=self._id, scheme=self._scheme,
+				weight=self._weight
+			)
+		else:
+			return self.__class__(
+				red=self.red, green=self.green, blue=self.blue, name=self._name, id=None, scheme=None,
+				weight=self._weight
+			)
 
 	def __str__(self):
 		return f'{self.name}: {self.hexadecimal}'
@@ -87,48 +181,26 @@ class Colour:
 	@staticmethod
 	def _get_hexadecimals():
 		"""
-		:rtype: dict[str,str]
+		:rtype: dict[str, str]
 		"""
 		return name_to_hexadecimal
 
 	@classmethod
 	def get_standard_colours(cls):
-		return [cls.from_hexadecimal(hexadecimal=hexadecimal, name=name) for hexadecimal, name in cls._get_names().items()]
+		"""
+		:rtype: list[Colour]
+		"""
+		return [cls(hexadecimal=hexadecimal, name=name) for hexadecimal, name in cls._get_names().items()]
 
 	@staticmethod
 	def get_schemes():
+		"""
+		:rtype: dict[str, list[str]]
+		"""
 		return colour_schemes.copy()
 
-	@classmethod
-	def from_hsl(cls, hue, saturation, lightness, name=None):
-		"""
-		:type hue: float
-		:type saturation: float
-		:type lightness: float
-		:type name: str
-		:rtype: Colour
-		"""
-		red, green, blue = colorsys.hls_to_rgb(h=hue, l=lightness, s=saturation)
-		return cls(red=red, green=green, blue=blue, min_value=0, max_value=1, name=name)
-
-	@classmethod
-	def from_hsv(cls, hue, saturation, value, name=None):
-		"""
-		:type hue: float
-		:type saturation: float
-		:type value: float
-		:rtype: Colour
-		"""
-		red, green, blue = colorsys.hsv_to_rgb(h=hue, s=saturation, v=value)
-		return cls(red=red, green=green, blue=blue, min_value=0, max_value=1, name=name)
-
-	@classmethod
-	def from_hexadecimal(cls, hexadecimal, name=None):
-		"""
-		:type hexadecimal: str
-		:type name: NoneType or str
-		:rtype: Colour
-		"""
+	@staticmethod
+	def convert_hexadecimal_to_rgb(hexadecimal):
 		if hexadecimal.startswith('#'):
 			hexadecimal = hexadecimal[1:]
 
@@ -144,77 +216,123 @@ class Colour:
 		red = int(f"0x{hexadecimal[0:2]}", 16)
 		green = int(f"0x{hexadecimal[2:4]}", 16)
 		blue = int(f"0x{hexadecimal[4:6]}", 16)
-
-		return cls(red=red, green=green, blue=blue, min_value=0.0, max_value=255, name=name)
+		return red, green, blue
 
 	@property
 	def name(self):
-		if self._name is not None:
-			return self._name
-		else:
-			return self.find_nearest(colours=self.get_standard_colours()).name
+		if self._name is None:
+			self._name = self.find_nearest(colours=self.get_standard_colours()).name
+		return self._name
 
 	@property
 	def rgb(self):
+		"""
+		:rtype: tuple
+		"""
 		return self.red, self.green, self.blue
 
 	@property
 	def hsl(self):
+		"""
+		:rtype: tuple
+		"""
 		h, l, s = colorsys.rgb_to_hls(r=self.red, g=self.green, b=self.blue)
 		return h, s, l
 
 	@property
 	def yig(self):
+		"""
+		:rtype: tuple
+		"""
 		return colorsys.rgb_to_yiq(r=self.red, g=self.green, b=self.blue)
 
 	@property
 	def hsv(self):
+		"""
+		:rtype: tuple
+		"""
 		return colorsys.rgb_to_hsv(r=self.red, g=self.green, b=self.blue)
 
 	@property
 	def hue(self):
+		"""
+		:rtype: float
+		"""
 		return self.hsl[0]
 
 	@hue.setter
 	def hue(self, hue):
 		_, saturation, lightness = self.hsl
-		self._red, self._green, self._blue = colorsys.hls_to_rgb(h=hue, l=lightness, s=saturation)
+		hue = hue % 1.0
+		self.__delete_identity()
+		self.red, self._green, self._blue = colorsys.hls_to_rgb(h=hue, l=lightness, s=saturation)
 
 	@property
 	def saturation(self):
+		"""
+		:rtype: float
+		"""
 		return self.hsl[1]
 
 	@saturation.setter
 	def saturation(self, saturation):
+		saturation = min(1.0, max(0, saturation))
 		hue, _, lightness = self.hsl
-		self._red, self._green, self._blue = colorsys.hls_to_rgb(h=hue, l=lightness, s=saturation)
+		self._name = None
+		self.red, self._green, self._blue = colorsys.hls_to_rgb(h=hue, l=lightness, s=saturation)
+
+	def set_lightness_and_saturation(self, lightness, saturation):
+		hue = self.hue
+		self.red, self._green, self._blue = colorsys.hls_to_rgb(h=hue, l=lightness, s=saturation)
 
 	@property
 	def lightness(self):
+		"""
+		:rtype: float
+		"""
 		return self.hsl[2]
 
 	@lightness.setter
 	def lightness(self, lightness):
+		lightness = min(1.0, max(0.0, lightness))
 		hue, saturation, _ = self.hsl
-		self._red, self._green, self._blue = colorsys.hls_to_rgb(h=hue, l=lightness, s=saturation)
+		self._name = None
+		self.red, self._green, self._blue = colorsys.hls_to_rgb(h=hue, l=lightness, s=saturation)
 
 	@property
 	def value(self):
+		"""
+		:rtype: float
+		"""
 		return self.hsv[2]
+
+	@value.setter
+	def value(self, value):
+		value = min(1.0, max(0.0, value))
+		hue, saturation, _ = self.hsv
+		self._name = None
+		self.red, self._green, self._blue = colorsys.hsv_to_rgb(h=hue, v=value, s=saturation)
 
 	@property
 	def hexadecimal(self):
+		"""
+		:rtype: str
+		"""
 		r = int(min(max(0.0, self.red * 255), 255))
 		g = int(min(max(0.0, self.green * 255), 255))
 		b = int(min(max(0.0, self.blue * 255), 255))
 		return '#{:02x}{:02x}{:02x}'.format(r, g, b)
 
-	def get_hexadecimal(self, opacity=1.0):
-		r = int(min(max(0.0, self.red * 255), 255))
-		g = int(min(max(0.0, self.green * 255), 255))
-		b = int(min(max(0.0, self.blue * 255), 255))
-		o = int(min(max(0.0, opacity * 255), 255))
-		return '#{:02x}{:02x}{:02x}{:02x}'.format(r, g, b, o)
+	def get_hexadecimal(self, opacity=None):
+		"""
+		:rtype: str
+		"""
+		if opacity is None:
+			result = self.hexadecimal
+		else:
+			o = int(min(max(0.0, opacity * 255), 255))
+			result = '{}{:02x}'.format(self.hexadecimal, o)
+		return result
 
 	def get_distance(self, other):
 		"""
@@ -256,10 +374,13 @@ class Colour:
 			return self.__class__(
 				red=self._red + other._red,
 				green=self._green + other._green,
-				blue=self._blue + other._blue
+				blue=self._blue + other._blue,
+				weight=self._weight
 			)
 		else:
-			return self.__class__(red=self._red + other, green=self._green + other, blue=self._blue + other)
+			return self.__class__(
+				red=self._red + other, green=self._green + other, blue=self._blue + other, weight=self._weight
+			)
 
 	def __sub__(self, other):
 		"""
@@ -276,10 +397,11 @@ class Colour:
 
 	def __mul__(self, other):
 		"""
-		:type other: float
+		:type other: float or tuple or Colour
 		:rtype: Colour
 		"""
-		other = self._tuple_as_colour(other=other)
+		if isinstance(other, (list, tuple)):
+			other = self._tuple_as_colour(other=other)
 
 		if isinstance(other, Colour):
 			return self.__class__(
@@ -288,7 +410,7 @@ class Colour:
 				blue=self.blue * other.blue
 			)
 		else:
-			return self.__class__(red=self._red * other, green=self._green * other, blue=self._blue * other)
+			return self.__class__(red=self._red, green=self._green, blue=self._blue, weight=self._weight * other)
 
 	def __neg__(self):
 		"""
@@ -316,17 +438,21 @@ class Colour:
 
 		return self + other
 
+	def __hashkey__(self):
+		return self.__class__.__name__, self.__getstate__()
+
 	def __getstate__(self):
-		return self.red, self.green, self.blue, self._name
+		return self.red, self.green, self.blue, self._name, self._id, self._weight, None
 
 	def __setstate__(self, state):
-		self._red, self._green, self._blue, self._name = state
+		self._red, self._green, self._blue, self._name, self._id, self._weight, self._scheme = state
 
-	@property
-	def farthest_gray(self):
-		return self.__class__(name='white') if self.lightness < 0.5 else self.__class__(name='black')
+	@classmethod
+	def _from_state(cls, state):
+		red, green, blue, name, id, weight, _ = state
+		return cls(red=red, green=green, blue=blue, id=id, weight=weight)
 
-	def colourize(self, string, background='auto'):
+	def colourize(self, string, background=None):
 		if background == 'auto':
 			background = self.farthest_gray
 
@@ -347,7 +473,7 @@ class Colour:
 		if text_colour is not None:
 			bg_red, bg_green, bg_blue = text_colour.rgb
 		else:
-			bg_red, bg_green, bg_blue = self.__class__.from_hexadecimal(hexadecimal='#808080').rgb
+			bg_red, bg_green, bg_blue = self.__class__(hexadecimal='#808080').rgb
 
 		return colourize(
 			string=string, bg_red=self.red, bg_green=self.green, bg_blue=self.blue,
@@ -366,22 +492,222 @@ class Colour:
 			string = ('{:^' + str(int(length)) + '}').format(string)
 		self.print(string=string, secondary=secondary, end=end, main_colour=main_colour)
 
-	def darken(self, ratio=0.5):
+	def mix_with_gray(self, gray_weight=None):
 		"""
+		:type gray_weight: NoneType or float
+		:rtype: Colour
+		"""
+		gray = self.nearest_gray
+		if gray_weight:
+			gray._weight = gray_weight
+		return self.mix(colours=gray)
+
+	def darken(self, ratio=DEFAULT_INCREASE_RATIO, amount=None, keep_id=True):
+		"""
+		:type ratio: float or NoneType
+		:type amount: float or NoneType
+		:type keep_id: bool
 		:rtype: Colour
 		"""
 		ratio = min(1.0, max(-1.0, ratio))
-		darker = self.copy()
-		darker.lightness = darker.lightness * (1 - ratio)
+		darker = self.copy(keep_id=keep_id)
+		amount = amount or darker.lightness * ratio
+		darker.lightness = darker.lightness - amount
 		return darker
 
-	def lighten(self, ratio=0.5):
+	def lighten(self, ratio=DEFAULT_INCREASE_RATIO, amount=None, keep_id=True):
 		"""
+		:type ratio: float or NoneType
+		:type amount: float or NoneType
+		:type keep_id: bool
 		:rtype: Colour
 		"""
 		ratio = min(1.0, max(-1.0, ratio))
-		lighter = self.copy()
-		lighter.lightness = lighter.lightness * (1 + ratio)
+		lighter = self.copy(keep_id=keep_id)
+		amount = amount or lighter.lightness * ratio
+		lighter.lightness = lighter.lightness + amount
 		return lighter
 
+	def saturate(self, ratio=DEFAULT_INCREASE_RATIO, amount=None, keep_id=True):
+		"""
+		:type ratio: float or NoneType
+		:type amount: float or NoneType
+		:type keep_id: bool
+		:rtype: Colour
+		"""
+		ratio = min(1.0, max(-1.0, ratio))
+		more_saturated = self.copy(keep_id=keep_id)
+		amount = amount or more_saturated.saturation * ratio
+		more_saturated.saturation = more_saturated.saturation + amount
+		return more_saturated
+
+	def pale(self, ratio=DEFAULT_INCREASE_RATIO, amount=None, keep_id=True):
+		"""
+		:type ratio: float or NoneType
+		:type amount: float or NoneType
+		:type keep_id: bool
+		:rtype: Colour
+		"""
+		ratio = min(1.0, max(0.0, ratio))
+		less_saturated = self.copy(keep_id=keep_id)
+		amount = amount or less_saturated.saturation * ratio
+		less_saturated.saturation = less_saturated.saturation - amount
+		return less_saturated
+
+	def darken_or_lighten(self, ratio=DEFAULT_INCREASE_RATIO, amount=None, keep_id=True):
+		"""
+		:type ratio: float or NoneType
+		:type amount: float or NoneType
+		:type keep_id: bool
+		:rtype: Colour
+		"""
+		if self.lightness <= 0.5:
+			return self.lighten(ratio=ratio, amount=amount, keep_id=keep_id)
+		else:
+			return self.darken(ratio=ratio, amount=amount, keep_id=keep_id)
+
+	def blacken_or_whiten(self):
+		"""
+		:rtype: Colour
+		"""
+		return self.farthest_gray
+
 	brighten = lighten
+
+	def increase_hue(self, amount=DEFAULT_INCREASE_AMOUNT, keep_id=False):
+		"""
+		:type amount: float
+		:type keep_id: bool
+		:type keep_id: bool
+		:rtype: Colour
+		"""
+		changed = self.copy(keep_id=keep_id)
+		changed.hue = changed.hue + amount
+		return changed
+
+	@property
+	def farthest_gray(self):
+		"""
+		:rtype: Colour
+		"""
+		if self.lightness < 0.5:
+			return self.__class__(hexadecimal='#FFFFFF', weight=self._weight)
+		else:
+			return self.__class__(hexadecimal='#000000', weight=self._weight)
+
+	@property
+	def nearest_gray(self, keep_id=False):
+		"""
+		:type keep_id: bool
+		:rtype: Colour
+		"""
+		gray = self.copy(keep_id=keep_id)
+		gray.saturation = 0
+		return gray
+
+	@property
+	def nearest_red(self, keep_id=False):
+		"""
+		:type keep_id: bool
+		:rtype: Colour
+		"""
+		red = self.copy(keep_id=keep_id)
+		red.hue = 0
+		return red
+
+	@property
+	def nearest_green(self, keep_id=False):
+		"""
+		:type keep_id: bool
+		:rtype: Colour
+		"""
+		green = self.copy(keep_id=keep_id)
+		green.hue = 1.0/3.0
+		return green
+
+	@property
+	def nearest_blue(self, keep_id=False):
+		"""
+		:type keep_id: bool
+		:rtype: Colour
+		"""
+		blue = self.copy(keep_id=keep_id)
+		blue.hue = 2.0/3.0
+		return blue
+
+	def reverse_lightness(self, keep_id=True):
+		"""
+		:type keep_id: bool
+		:rtype: Colour
+		"""
+		_reversed = self.copy(keep_id=keep_id)
+		_reversed.lightness = 1 - _reversed.lightness
+		return _reversed
+
+	def invert(self):
+		"""
+		:rtype: Colour
+		"""
+		result = self.__class__(red=1 - self.red, green=1 - self.green, blue=1 - self.blue)
+		return result
+
+	def mix(self=None, colours=None):
+		"""
+		:type colours: NoneType or Colour or list[Colour]
+		:rtype: Colour
+		"""
+		if colours is None or colours == []:
+			return self.copy(keep_id=True)
+		else:
+			if isinstance(colours, Colour):
+				colours = [colours]
+
+		if self is not None:
+			colours = [self] + colours
+
+		red = green = blue = lightness = saturation = 0.0
+		id = colours[0].id
+		scheme = colours[0].scheme
+		for colour in colours:
+			red += colour.red * colour._weight
+			green += colour.green * colour._weight
+			blue += colour.blue * colour._weight
+			#lightness += colour.lightness * colour._weight
+			#saturation += colour.saturation * colour._weight
+			if id != colour.id:
+				id = None
+				scheme = None
+
+		total_weight = sum([colour._weight for colour in colours])
+		red = red / total_weight
+		green = green / total_weight
+		blue = blue / total_weight
+		#lightness = lightness / total_weight
+		#saturation = saturation / total_weight
+		if self is not None:
+			result = self.__class__(
+				red=red, green=green, blue=blue, min_value=0.0, max_value=1.0, id=id, scheme=scheme,
+				weight=total_weight
+			)
+		else:
+			result = Colour(
+				red=red, green=green, blue=blue, min_value=0.0, max_value=1.0, id=id, scheme=scheme,
+				weight=total_weight
+			)
+
+		#result.set_lightness_and_saturation(lightness=lightness, saturation=saturation)
+		return result
+
+	@property
+	def weight(self):
+		"""
+		:rtype: float
+		"""
+		return self._weight
+
+	@weight.setter
+	def weight(self, weight):
+		"""
+		:type weight: float
+		"""
+		self._weight = weight
