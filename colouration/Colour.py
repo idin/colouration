@@ -22,9 +22,10 @@ class Colour:
 			weight=1.0
 	):
 		"""
-		:type red: float
-		:type green: float
-		:type blue: float
+		:type obj: str or NoneType or Colour
+		:type red: float or NoneType
+		:type green: float or NoneType
+		:type blue: float or NoneType
 		:type min_value: float
 		:type max_value: float
 		:type name: NoneType or str
@@ -101,6 +102,11 @@ class Colour:
 		return self._id
 
 	def use(self, log=None):
+		"""
+		logs the usage of a colour
+		:type log:
+		:rtype: NoneType
+		"""
 		if self.scheme is not None:
 			self.scheme.use(colour=self, log=log)
 
@@ -456,10 +462,12 @@ class Colour:
 		if background == 'auto':
 			background = self.farthest_gray
 
-		if background is not None:
-			bg_red, bg_green, bg_blue = background.rgb
-		else:
+		if background is None:
 			bg_red, bg_green, bg_blue = None, None, None
+		else:
+			if not isinstance(background, self.__class__):
+				background = self.__class__(obj=background)
+			bg_red, bg_green, bg_blue = background.rgb
 
 		return colourize(
 			string=string, red=self.red, green=self.green, blue=self.blue,
@@ -467,7 +475,7 @@ class Colour:
 		)
 
 	def colourize_background(self, string, text_colour='auto'):
-		if text_colour == 'auto':
+		if isinstance(text_colour, str) and text_colour == 'auto':
 			text_colour = self.farthest_gray
 
 		if text_colour is not None:
@@ -511,7 +519,10 @@ class Colour:
 		"""
 		ratio = min(1.0, max(-1.0, ratio))
 		darker = self.copy(keep_id=keep_id)
-		amount = amount or darker.lightness * ratio
+
+		if amount is None:
+			amount = self.lightness ** 0.5 * ratio
+
 		darker.lightness = darker.lightness - amount
 		return darker
 
@@ -524,7 +535,10 @@ class Colour:
 		"""
 		ratio = min(1.0, max(-1.0, ratio))
 		lighter = self.copy(keep_id=keep_id)
-		amount = amount or lighter.lightness * ratio
+
+		if amount is None:
+			amount = (1 - self.lightness) * ratio
+
 		lighter.lightness = lighter.lightness + amount
 		return lighter
 
@@ -537,7 +551,10 @@ class Colour:
 		"""
 		ratio = min(1.0, max(-1.0, ratio))
 		more_saturated = self.copy(keep_id=keep_id)
-		amount = amount or more_saturated.saturation * ratio
+
+		if amount is None:
+			amount = (1 - self.saturation) * ratio
+
 		more_saturated.saturation = more_saturated.saturation + amount
 		return more_saturated
 
@@ -548,9 +565,12 @@ class Colour:
 		:type keep_id: bool
 		:rtype: Colour
 		"""
-		ratio = min(1.0, max(0.0, ratio))
+		ratio = min(1.0, max(-1.0, ratio))
 		less_saturated = self.copy(keep_id=keep_id)
-		amount = amount or less_saturated.saturation * ratio
+
+		if amount is None:
+			amount = self.saturation * ratio
+
 		less_saturated.saturation = less_saturated.saturation - amount
 		return less_saturated
 
@@ -711,3 +731,11 @@ class Colour:
 		:type weight: float
 		"""
 		self._weight = weight
+
+	def __eq__(self, other):
+		if not isinstance(other, self.__class__):
+			other = self.__class__(obj=other)
+		return self.hexadecimal == other.hexadecimal
+
+	def __hash__(self):
+		return hash(self.hexadecimal)

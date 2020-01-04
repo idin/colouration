@@ -4,10 +4,26 @@ from .Colour import Colour, DEFAULT_INCREASE_RATIO
 
 DEFAULT_SCHEME_NAME = 'pastel19'
 
+ADDITIONAL_SCHEMES = {
+	'pensieve': ['#fbb4ae', '#ccebc5', '#decbe4', '#fed9a6', '#fff2ae', '#e5d8bd', '#fddaec'],
+	'pensieve2': [
+		'#8dd3c7', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#bc80bd', '#ccebc5', '#ffed6f'
+	]
+}
+
 
 class Scheme:
-	def __init__(self, colours=None, name=DEFAULT_SCHEME_NAME):
-		colours = colours or [Colour(hexadecimal=hex) for hex in colour_schemes[name.lower()]]
+	def __init__(self, colours=None, name=DEFAULT_SCHEME_NAME, normalize_lightness=0.5):
+		if colours is None and name.lower() in ADDITIONAL_SCHEMES:
+			colours = [Colour(hexadecimal=hex) for hex in ADDITIONAL_SCHEMES[name]]
+		else:
+			colours = colours or [Colour(hexadecimal=hex) for hex in colour_schemes[name.lower()]]
+
+		if normalize_lightness is not None:
+			mean_lightness = sum([colour.lightness for colour in colours]) / len(colours)
+			mean_lightness = mean_lightness + (1 - mean_lightness) * normalize_lightness
+			for colour in colours:
+				colour.lightness = mean_lightness
 
 		self._colours = {}
 		self._colour_usages = {}

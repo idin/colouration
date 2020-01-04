@@ -28,4 +28,3 @@ for hexadecimal, name in hexadecimal_to_x11.items():
 
 with open(file=colour_schemes_path, mode='rb') as colour_schemes_file:
 	colour_schemes = pickle.load(file=colour_schemes_file)
-
