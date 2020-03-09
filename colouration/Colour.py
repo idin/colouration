@@ -51,7 +51,7 @@ class Colour:
 				red, green, blue = obj
 
 			else:
-				raise TypeError('obj should be one of str, Colour, tuple, or list.')
+				raise TypeError(f'obj should be one of str, Colour, tuple, or list but it is {type(obj)}')
 			min_value = 0.0
 			max_value = 1.0
 
