@@ -4,3 +4,4 @@ build/*
 colouration\.egg-info/
 
 dist/
+*.lucy
