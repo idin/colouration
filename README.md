@@ -87,4 +87,36 @@ bluish.print(string=f'Colour finds the best name for itself: {bluish.name}.\n')
 
 ### `Scheme`
 
+A `Scheme` is a collection of colours that can be used together. You can create a scheme by specifying a list of `Colour` objects.
+
+```python
+from colouration import Scheme
+
+# Create a scheme with multiple colours
+my_scheme = Scheme(colours=[Colour('red'), Colour('green'), Colour('blue')])
+
+# Print the colours in the scheme
+my_scheme.print_colours()
+```
+
 ### `Gradient`
+
+A `Gradient` represents a transition between two or more colours. You can create a gradient by specifying the start and end colours.
+
+```python
+from colouration import Gradient
+
+# Create a gradient from red to blue
+my_gradient = Gradient(start=Colour('red'), end=Colour('blue'))
+
+# Print the gradient
+my_gradient.print_gradient()
+```
+
+## Contributing
+
+If you would like to contribute to *Colouration*, please fork the repository and submit a pull request. 
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
