@@ -1,0 +1,18 @@
+# ignore: pycache, build, .idea, pytest cache, vscode, cursor rules
+__pycache__
+build
+.idea
+.pytest_cache
+.vscode
+.cursor
+
+# do not ignore data_files
+!data_files/*
+
+# do not ignore data_files/colour_schemes.pickle
+!data_files/colour_schemes.pickle
+
+# do not ignore data_files/svg_colours.pickle
+!data_files/svg_colours.pickle
+
+
